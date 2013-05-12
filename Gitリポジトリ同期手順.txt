@@ -1,0 +1,222 @@
+------------------------------------------------------------------------
+Gitリポジトリ同期手順
+------------------------------------------------------------------------
+
+1. はじめに
+  ・複数のGitリポジトリを同期する方法を整理する。
+  ・ネットワーク的に直結できる場合は、Gitがもともと持っているマージ機構
+    で同期できる。課題は、ネットワーク的に直結できない場合。具体的には、
+    複数拠点の開発。
+
+
+2. 全体概要
+2.1 前提
+(1) 拠点
+  ・ALICE
+  ・BOB
+
+(2) ブランチ構成
+  ・[ALICE] 作業用
+      develop: 開発のメインストリーム
+        -> bundleファイル; alice.repos
+      to.merge: 拠点間同期用
+      bob.repos: 対向拠点を表すリモートリポジトリ
+        <- bundleファイル; bob.repos
+
+  ・[BOB] 作業用
+      develop
+        -> bundleファイル; bob.repos
+      to.merge: 拠点間同期用
+      alice.repos: 対向拠点を表すリモートリポジトリ
+        <- bundleファイル; alice.repos
+
+
+2.2 概要
+(1) 準備
+
+[ALICE]                                 [BOB]
+[主リポ][作業用]                        [作業用]                [主リポ]
+|
+|リポ作成
+|------>|clone
+|       |                                                       |リポ作成
+|       |                               |clone <----------------|
+|       |                               |                       |
+|       |                               |bundle create (develop)|
+|       |bundleファイル転送 <===========|                       |
+|       |remote add (bob.repos <- bundleファイル)               |
+|       |remote update                  |                       |
+|       |branch (to.merge <- develop)   |                       |
+|       |merge (to.merge <- bob.repos)  |                       |
+|       |merge (develop <- to.merge)    |                       |
+|<------|push (develop)                 |                       |
+|       |                               |                       |
+|       |bundle create (develop)        |                       |
+|       |==============================>|bundleファイル転送     |
+|       |                               |remote add (alice.repos <- bundleファイル)
+|       |                               |remote update          |
+|       |                               |branch (to.merge <- develop)
+|       |                               |merge (to.merge <- alice.repos)
+|       |                               |merge (develop <- to.merge)
+|       |                               |push (develop) ------->|
+|       |                               |                       |
+
+
+(2) 同期
+
+[ALICE]                                 [BOB]
+[主リポ][作業用]                        [作業用]                [主リポ]
+|       |                               |                       |
+|------>|pull (develop)                 |                       |
+|       |                               |pull (develop) <-------|
+|       |                               |                       |
+|       |                               |bundle create (develop)|
+|       |bundleファイル転送 <===========|                       |
+|       |bundleファイル置換え           |                       |
+|       |remote update                  |                       |
+|       |merge (to.merge <- develop)    |                       |
+|       |merge (to.merge <- bob.repos)  |                       |
+|       |merge (develop <- to.merge)    |                       |
+|<------|push (develop)                 |                       |
+|       |                               |                       |
+|       |bundle create (develop)        |                       |
+|       |==============================>|bundleファイル転送     |
+|       |                               |bundleファイル置換え   |
+|       |                               |remote update          |
+|       |                               |merge (to.merge <- develop)
+|       |                               |merge (to.merge <- alice.repos)
+|       |                               |merge (develop <- to.merge)
+|       |                               |push (develop) ------->|
+|       |                               |                       |
+
+
+3. 実験
+3.0 事前準備
+
+cd
+mkdir gitexp
+cd gitexp
+mkdir -p alice/repos/proj.git alice/work
+mkdir -p bob/repos/proj.git bob/work
+git init --bare alice/repos/proj.git
+git init --bare bob/repos/proj.git
+
+
+[ALICE (主リポ準備)]
+cd
+cd gitexp/alice
+git clone repos/proj.git
+cd proj
+git flow init
+git push origin develop
+git checkout master
+git push origin master
+git checkout develop
+git branch --set-upstream develop origin/develop
+
+
+[BOB (主リポ準備)]
+cd
+cd gitexp/bob
+git clone repos/proj.git
+cd proj
+git flow init
+git push origin develop
+git checkout master
+git push origin master
+git checkout develop
+git branch --set-upstream develop origin/develop
+
+
+3.1 準備
+(1) [ALICE] clone
+
+[ALICE (同期作業用)]
+cd
+cd gitexp/alice/work
+git clone ../repos/proj.git
+cd proj
+git branch develop origin/develop
+git checkout develop
+
+
+(2) [BOB] clone
+
+[BOB (同期作業用)]
+cd
+cd gitexp/bob/work
+git clone ../repos/proj.git
+cd proj
+git branch develop origin/develop
+git checkout develop
+
+
+(3) BOBからALICEへ同期
+
+[BOB (同期作業用)]
+git bundle create ../../../bob.repos develop
+
+[ALICE (同期作業用)]
+git remote add bob.repos ../../../bob.repos
+git remote update
+git branch to.merge develop
+git checkout to.merge
+git merge bob.repos/develop
+git checkout develop
+git merge to.merge
+git push
+
+(4) ALICEからBOBへ同期
+
+[ALICE (同期作業用)]
+git bundle create ../../../alice.repos develop
+
+[BOB (同期作業用)]
+git remote add alice.repos ../../../alice.repos
+git remote update
+git branch to.merge develop
+git checkout to.merge
+git merge alice.repos/develop
+git checkout develop
+git merge to.merge
+git push
+
+
+3.2 同期
+(1) BOBからALICEへ同期
+
+[ALICE (同期作業用)]
+git pull
+
+[BOB (同期作業用)]
+git pull
+
+[BOB (同期作業用)]
+git bundle create ../../../bob.repos develop
+
+[ALICE (同期作業用)]
+git remote update
+git checkout to.merge
+git merge develop
+git merge bob.repos/develop
+git checkout develop
+git merge to.merge
+git push
+
+
+(2) ALICEからBOBへ同期
+
+[ALICE (同期作業用)]
+git bundle create ../../../alice.repos develop
+
+[BOB (同期作業用)]
+git remote update
+git checkout to.merge
+git merge develop
+git merge alice.repos/develop
+git checkout develop
+git merge to.merge
+git push
+
+
+以上。
