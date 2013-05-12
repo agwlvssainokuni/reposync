@@ -12,8 +12,8 @@ Gitリポジトリ同期手順
 2. 全体概要
 2.1 前提
 (1) 拠点
-  ・ALICE
-  ・BOB
+  ・ALICE: 主
+  ・BOB:   従
 
 (2) ブランチ構成
   ・[ALICE] 作業用
@@ -37,19 +37,10 @@ Gitリポジトリ同期手順
 [ALICE]                                 [BOB]
 [主リポ][作業用]                        [作業用]                [主リポ]
 |
-|リポ作成
+|既存リポ
 |------>|clone
 |       |                                                       |リポ作成
 |       |                               |clone <----------------|
-|       |                               |                       |
-|       |                               |bundle create (develop)|
-|       |bundleファイル転送 <===========|                       |
-|       |remote add (bob.repos <- bundleファイル)               |
-|       |remote update                  |                       |
-|       |branch (to.merge <- develop)   |                       |
-|       |merge (to.merge <- bob.repos)  |                       |
-|       |merge (develop <- to.merge)    |                       |
-|<------|push (develop)                 |                       |
 |       |                               |                       |
 |       |bundle create (develop)        |                       |
 |       |==============================>|bundleファイル転送     |
@@ -59,6 +50,15 @@ Gitリポジトリ同期手順
 |       |                               |merge (to.merge <- alice.repos)
 |       |                               |merge (develop <- to.merge)
 |       |                               |push (develop) ------->|
+|       |                               |                       |
+|       |                               |bundle create (develop)|
+|       |bundleファイル転送 <===========|                       |
+|       |remote add (bob.repos <- bundleファイル)               |
+|       |remote update                  |                       |
+|       |branch (to.merge <- develop)   |                       |
+|       |merge (to.merge <- bob.repos)  |                       |
+|       |merge (develop <- to.merge)    |                       |
+|<------|push (develop)                 |                       |
 |       |                               |                       |
 
 
@@ -149,24 +149,7 @@ git branch develop origin/develop
 git checkout develop
 
 
-(3) BOBからALICEへ同期
-
-[BOB (同期作業用)]
-git checkout develop
-git bundle create ../../../bob.repos develop
-
-[ALICE (同期作業用)]
-git remote add bob.repos ../../../bob.repos
-git remote update
-git branch to.merge develop
-git checkout to.merge
-git merge bob.repos/develop
-git checkout develop
-git merge to.merge
-git push
-
-
-(4) ALICEからBOBへ同期
+(3) ALICEからBOBへ同期
 
 [ALICE (同期作業用)]
 git checkout develop
@@ -178,6 +161,23 @@ git remote update
 git branch to.merge develop
 git checkout to.merge
 git merge alice.repos/develop
+git checkout develop
+git merge to.merge
+git push
+
+
+(4) BOBからALICEへ同期
+
+[BOB (同期作業用)]
+git checkout develop
+git bundle create ../../../bob.repos develop
+
+[ALICE (同期作業用)]
+git remote add bob.repos ../../../bob.repos
+git remote update
+git branch to.merge develop
+git checkout to.merge
+git merge bob.repos/develop
 git checkout develop
 git merge to.merge
 git push
